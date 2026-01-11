@@ -25,6 +25,16 @@ export class Router<Context extends Record<string, any> = {}> {
 		PUT: [],
 	};
 
+	private notFoundHandler: Handler<Context> = (
+		_params: HandlerParams<Context>,
+	) => new Response("Not Found", { status: 404 });
+
+	// Override the not found handler
+	setNotFoundHandler = (handler: Handler<Context>) => {
+		this.notFoundHandler = handler;
+		return this;
+	};
+
 	// Register route: creates URLPattern, stores handler, enables chaining
 	add = (
 		method: HttpMethod,
@@ -57,7 +67,12 @@ export class Router<Context extends Record<string, any> = {}> {
 			}
 		}
 
-		return new Response("Not Found", { status: 404 });
+		return this.notFoundHandler({
+			body,
+			urlParams: {},
+			searchParams,
+			...context,
+		});
 	};
 
 	// Helper method for GET requests

@@ -654,4 +654,227 @@ describe("Router", () => {
 			expect(await response5.text()).toBe("DELETE");
 		});
 	});
+
+	describe("setNotFoundHandler", () => {
+		let router: Router;
+
+		beforeEach(() => {
+			router = new Router();
+		});
+
+		it("should use custom not found handler for unmatched routes", async () => {
+			const notFoundHandler: Handler = () =>
+				new Response("Custom Not Found", { status: 404 });
+			router.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(404);
+			expect(await response.text()).toBe("Custom Not Found");
+		});
+
+		it("should use custom not found handler for unmatched HTTP methods", async () => {
+			const notFoundHandler: Handler = () =>
+				new Response("Method Not Allowed", { status: 405 });
+			router.setNotFoundHandler(notFoundHandler);
+			router.get("/resource", () => new Response("OK"));
+
+			const request = new Request("http://localhost/resource", {
+				method: "POST",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(405);
+			expect(await response.text()).toBe("Method Not Allowed");
+		});
+
+		it("should use default not found handler when not overridden", async () => {
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(404);
+			expect(await response.text()).toBe("Not Found");
+		});
+
+		it("should support method chaining with setNotFoundHandler", async () => {
+			const notFoundHandler: Handler = () =>
+				new Response("Not Found", { status: 404 });
+			const result = router.setNotFoundHandler(notFoundHandler);
+
+			expect(result).toBe(router);
+		});
+
+		it("should allow chaining setNotFoundHandler with other methods", async () => {
+			router
+				.setNotFoundHandler(() => new Response("Custom 404", { status: 404 }))
+				.get("/test", () => new Response("OK"))
+				.post("/items", () => new Response("Created", { status: 201 }));
+
+			const matchRequest = new Request("http://localhost/test", {
+				method: "GET",
+			});
+			const matchResponse = await router.match(matchRequest, {});
+			expect(await matchResponse.text()).toBe("OK");
+
+			const notFoundRequest = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const notFoundResponse = await router.match(notFoundRequest, {});
+			expect(await notFoundResponse.text()).toBe("Custom 404");
+		});
+
+		it("should pass request data to custom not found handler", async () => {
+			let capturedBody = "";
+			let capturedSearchParams: URLSearchParams = new URLSearchParams();
+
+			const notFoundHandler: Handler = (params) => {
+				capturedBody = params.body;
+				capturedSearchParams = params.searchParams;
+				return new Response("Not Found", { status: 404 });
+			};
+			router.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/unknown?key=value", {
+				method: "POST",
+				body: "test data",
+			});
+			await router.match(request, {});
+
+			expect(capturedBody).toBe("test data");
+			expect(capturedSearchParams.get("key")).toBe("value");
+		});
+
+		it("should pass context to custom not found handler", async () => {
+			type MyContext = { userId: string; role: string };
+			const contextRouter = new Router<MyContext>();
+
+			let capturedUserId = "";
+			let capturedRole = "";
+
+			const notFoundHandler: Handler<MyContext> = (params) => {
+				capturedUserId = params.userId;
+				capturedRole = params.role;
+				return new Response("Not Found", { status: 404 });
+			};
+			contextRouter.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			await contextRouter.match(request, { userId: "user123", role: "admin" });
+
+			expect(capturedUserId).toBe("user123");
+			expect(capturedRole).toBe("admin");
+		});
+
+		it("should support async custom not found handler", async () => {
+			const notFoundHandler: Handler = async () => {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+				return new Response("Async Not Found", { status: 404 });
+			};
+			router.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(404);
+			expect(await response.text()).toBe("Async Not Found");
+		});
+
+		it("should allow overriding not found handler multiple times", async () => {
+			router.setNotFoundHandler(
+				() => new Response("First Handler", { status: 404 }),
+			);
+
+			let request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			let response = await router.match(request, {});
+			expect(await response.text()).toBe("First Handler");
+
+			router.setNotFoundHandler(
+				() => new Response("Second Handler", { status: 404 }),
+			);
+
+			request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			response = await router.match(request, {});
+			expect(await response.text()).toBe("Second Handler");
+		});
+
+		it("should use custom not found handler with different status codes", async () => {
+			router.setNotFoundHandler(
+				() => new Response("Not Found", { status: 404 }),
+			);
+
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(404);
+		});
+
+		it("should use custom not found handler with JSON response", async () => {
+			const notFoundHandler: Handler = () =>
+				new Response(
+					JSON.stringify({ error: "Resource not found", code: "NOT_FOUND" }),
+					{ status: 404, headers: { "Content-Type": "application/json" } },
+				);
+			router.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/unknown", {
+				method: "GET",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(404);
+			expect(response.headers.get("Content-Type")).toBe("application/json");
+			const body = JSON.parse(await response.text());
+			expect(body.error).toBe("Resource not found");
+			expect(body.code).toBe("NOT_FOUND");
+		});
+
+		it("should use custom not found handler when route path matches but method does not", async () => {
+			const notFoundHandler: Handler = () =>
+				new Response("Resource exists but method not allowed", { status: 405 });
+			router.setNotFoundHandler(notFoundHandler);
+			router.get("/resource", () => new Response("GET response"));
+
+			const request = new Request("http://localhost/resource", {
+				method: "DELETE",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(405);
+			expect(await response.text()).toBe(
+				"Resource exists but method not allowed",
+			);
+		});
+
+		it("should work with URL parameters in not found handler", async () => {
+			let capturedUrlParams: Record<string, string | undefined> = {};
+
+			const notFoundHandler: Handler = (params) => {
+				capturedUrlParams = params.urlParams;
+				return new Response("Not Found", { status: 404 });
+			};
+			router.setNotFoundHandler(notFoundHandler);
+
+			const request = new Request("http://localhost/api/v1/resource", {
+				method: "GET",
+			});
+			await router.match(request, {});
+
+			expect(capturedUrlParams).toEqual({});
+		});
+	});
 });
