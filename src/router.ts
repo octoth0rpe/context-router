@@ -59,4 +59,29 @@ export class Router<Context extends Record<string, any> = {}> {
 
 		return new Response("Not Found", { status: 404 });
 	};
+
+	// Helper method for GET requests
+	get = (pathname: string, handler: Handler<Context>): Router<Context> => {
+		return this.add("GET", pathname, handler);
+	};
+
+	// Helper method for POST requests
+	post = (pathname: string, handler: Handler<Context>): Router<Context> => {
+		return this.add("POST", pathname, handler);
+	};
+
+	// Helper method for PUT requests
+	put = (pathname: string, handler: Handler<Context>): Router<Context> => {
+		return this.add("PUT", pathname, handler);
+	};
+
+	// Helper method for PATCH requests
+	patch = (pathname: string, handler: Handler<Context>): Router<Context> => {
+		return this.add("PATCH", pathname, handler);
+	};
+
+	// Helper method for DELETE requests
+	delete = (pathname: string, handler: Handler<Context>): Router<Context> => {
+		return this.add("DELETE", pathname, handler);
+	};
 }

@@ -458,4 +458,200 @@ describe("Router", () => {
 			expect(JSON.parse(capturedBody)).toEqual(payload);
 		});
 	});
+
+	describe("HTTP helper methods", () => {
+		let router: Router;
+
+		beforeEach(() => {
+			router = new Router();
+		});
+
+		it("should register GET route using get() helper", async () => {
+			const handler: Handler = () => new Response("GET response");
+			router.get("/test", handler);
+
+			const request = new Request("http://localhost/test", { method: "GET" });
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("GET response");
+		});
+
+		it("should register POST route using post() helper", async () => {
+			const handler: Handler = () => new Response("POST response");
+			router.post("/test", handler);
+
+			const request = new Request("http://localhost/test", { method: "POST" });
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("POST response");
+		});
+
+		it("should register PUT route using put() helper", async () => {
+			const handler: Handler = () => new Response("PUT response");
+			router.put("/test", handler);
+
+			const request = new Request("http://localhost/test", { method: "PUT" });
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("PUT response");
+		});
+
+		it("should register PATCH route using patch() helper", async () => {
+			const handler: Handler = () => new Response("PATCH response");
+			router.patch("/test", handler);
+
+			const request = new Request("http://localhost/test", { method: "PATCH" });
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("PATCH response");
+		});
+
+		it("should register DELETE route using delete() helper", async () => {
+			const handler: Handler = () => new Response("DELETE response");
+			router.delete("/test", handler);
+
+			const request = new Request("http://localhost/test", {
+				method: "DELETE",
+			});
+			const response = await router.match(request, {});
+
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe("DELETE response");
+		});
+
+		it("should support method chaining with helper methods", async () => {
+			const handler: Handler = (params) => new Response(params.urlParams.id);
+
+			const result = router
+				.get("/users/:id", handler)
+				.post("/users", handler)
+				.put("/users/:id", handler)
+				.patch("/users/:id", handler)
+				.delete("/users/:id", handler);
+
+			expect(result).toBe(router);
+
+			// Verify all routes work
+			const getRequest = new Request("http://localhost/users/1", {
+				method: "GET",
+			});
+			const getResponse = await router.match(getRequest, {});
+			expect(await getResponse.text()).toBe("1");
+
+			const postRequest = new Request("http://localhost/users", {
+				method: "POST",
+			});
+			const postResponse = await router.match(postRequest, {});
+			expect(postResponse.status).toBe(200);
+
+			const putRequest = new Request("http://localhost/users/2", {
+				method: "PUT",
+			});
+			const putResponse = await router.match(putRequest, {});
+			expect(await putResponse.text()).toBe("2");
+
+			const patchRequest = new Request("http://localhost/users/3", {
+				method: "PATCH",
+			});
+			const patchResponse = await router.match(patchRequest, {});
+			expect(await patchResponse.text()).toBe("3");
+
+			const deleteRequest = new Request("http://localhost/users/4", {
+				method: "DELETE",
+			});
+			const deleteResponse = await router.match(deleteRequest, {});
+			expect(await deleteResponse.text()).toBe("4");
+		});
+
+		it("should work with URL parameters in helper methods", async () => {
+			let capturedParams: Record<string, string | undefined> = {};
+			const handler: Handler = (params) => {
+				capturedParams = params.urlParams;
+				return new Response("OK");
+			};
+
+			router.get("/posts/:postId", handler);
+
+			const request = new Request("http://localhost/posts/123", {
+				method: "GET",
+			});
+			await router.match(request, {});
+
+			expect(capturedParams["postId"]).toBe("123");
+		});
+
+		it("should work with context in helper methods", async () => {
+			type MyContext = { userId: string };
+			const contextRouter = new Router<MyContext>();
+
+			let capturedUserId = "";
+			const handler: Handler<MyContext> = (params) => {
+				capturedUserId = params.userId;
+				return new Response("OK");
+			};
+
+			contextRouter.post("/items", handler);
+
+			const request = new Request("http://localhost/items", { method: "POST" });
+			await contextRouter.match(request, { userId: "user123" });
+
+			expect(capturedUserId).toBe("user123");
+		});
+
+		it("should work with async handlers in helper methods", async () => {
+			const handler: Handler = async () => {
+				await new Promise((resolve) => setTimeout(resolve, 10));
+				return new Response("Async GET");
+			};
+
+			router.get("/async", handler);
+
+			const request = new Request("http://localhost/async", { method: "GET" });
+			const response = await router.match(request, {});
+
+			expect(await response.text()).toBe("Async GET");
+		});
+
+		it("should mix helper methods with add() method", async () => {
+			router.get("/route1", () => new Response("GET"));
+			router.add("POST", "/route2", () => new Response("POST"));
+			router.put("/route3", () => new Response("PUT"));
+			router.add("PATCH", "/route4", () => new Response("PATCH"));
+			router.delete("/route5", () => new Response("DELETE"));
+
+			const request1 = new Request("http://localhost/route1", {
+				method: "GET",
+			});
+			const response1 = await router.match(request1, {});
+			expect(await response1.text()).toBe("GET");
+
+			const request2 = new Request("http://localhost/route2", {
+				method: "POST",
+			});
+			const response2 = await router.match(request2, {});
+			expect(await response2.text()).toBe("POST");
+
+			const request3 = new Request("http://localhost/route3", {
+				method: "PUT",
+			});
+			const response3 = await router.match(request3, {});
+			expect(await response3.text()).toBe("PUT");
+
+			const request4 = new Request("http://localhost/route4", {
+				method: "PATCH",
+			});
+			const response4 = await router.match(request4, {});
+			expect(await response4.text()).toBe("PATCH");
+
+			const request5 = new Request("http://localhost/route5", {
+				method: "DELETE",
+			});
+			const response5 = await router.match(request5, {});
+			expect(await response5.text()).toBe("DELETE");
+		});
+	});
 });
