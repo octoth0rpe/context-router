@@ -1,0 +1,40 @@
+{
+  "name": "context-router",
+  "version": "1.0.0",
+  "description": "HTTP request router with URL pattern matching and context support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "vitest src/*.test.ts",
+    "test:ci": "vitest --watch=false src/*.test.ts",
+    "format": "biome format  --write ./src/*.ts",
+    "typecheck": "tsc -b"
+  },
+  "keywords": [
+    "router",
+    "http",
+    "typescript",
+    "urlpattern"
+  ],
+  "author": "Octoth0rpe",
+  "license": "ISC",
+  "devDependencies": {
+    "@biomejs/biome": "2.3.11",
+    "@types/node": "^25.0.6",
+    "typescript": "^5.3.3",
+    "vitest": "^4.0.16"
+  },
+  "engines": {
+    "node": ">=23.8.0"
+  }
+}
