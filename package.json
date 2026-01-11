@@ -1,6 +1,6 @@
 {
   "name": "context-router",
-  "version": "0.0.2",
+  "version": "1.0.0",
   "description": "HTTP request router with URL pattern matching and context support",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
